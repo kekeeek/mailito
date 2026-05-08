@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TempMail Pro MAX</title>
+
+<style>
+body{
+  font-family: Arial;
+  background:#0b0b0b;
+  color:white;
+  padding:20px;
+}
+
+h1{margin-bottom:10px;}
+
+button{
+  padding:10px 12px;
+  margin:5px;
+  border:none;
+  border-radius:8px;
+  background:#4a4aff;
+  color:white;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+button:hover{background:#2f2fff;}
+
+.box{
+  margin-top:15px;
+  padding:15px;
+  background:#161616;
+  border:1px solid #333;
+  border-radius:12px;
+}
+
+input{
+  width:320px;
+  padding:8px;
+  border-radius:8px;
+  border:1px solid #333;
+  background:#111;
+  color:white;
+}
+
+.row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.mail{
+  background:#222;
+  padding:10px;
+  margin-top:8px;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.small{font-size:12px;color:#aaa;}
+
+#timer{
+  font-weight:bold;
+  color:#00ff99;
+}
+</style>
+</head>
+
+<body>
+
+<h1>📩 TempMail PRO MAX</h1>
+
+<button onclick="createMail()">Créer une adresse</button>
+<button onclick="refreshInbox()">🔄 Refresh</button>
+<button onclick="newMail()">Nouvelle adresse</button>
+
+<div class="box">
+  <p><b>Email :</b></p>
+
+  <div class="row">
+    <input id="email" readonly value="---"/>
+    <button onclick="copyMail()">📋 Copier</button>
+  </div>
+
+  <p><b>Timer :</b> <span id="timer">10:00</span></p>
+</div>
+
+<div class="box">
+  <h3>📬 Inbox</h3>
+  <div id="inbox">Aucun message</div>
+</div>
+
+<audio id="notif" src="https://notificationsounds.com/storage/sounds/file-sounds-1151-pristine.mp3"></audio>
+
+<script>
+
+const API="https://api.mail.tm";
+
+let email="";
+let password="";
+let token="";
+let domains=[];
+let interval;
+let timerInterval;
+let timeLeft=600;
+let lastCount=0;
+
+// random
+function rand(n=10){
+  return Math.random().toString(36).substring(2,2+n);
+}
+
+// copy
+function copyMail(){
+  const v=document.getElementById("email").value;
+  navigator.clipboard.writeText(v);
+  alert("📋 Copié !");
+}
+
+// domains
+async function loadDomains(){
+  const r=await fetch(API+"/domains");
+  const d=await r.json();
+  domains=d["hydra:member"].map(x=>x.domain);
+}
+
+function pickDomain(){
+  return domains[Math.floor(Math.random()*domains.length)];
+}
+
+// timer
+function startTimer(){
+  clearInterval(timerInterval);
+
+  timeLeft=600;
+
+  timerInterval=setInterval(()=>{
+    timeLeft--;
+
+    let m=Math.floor(timeLeft/60);
+    let s=timeLeft%60;
+
+    document.getElementById("timer").innerText=
+      `${m}:${s.toString().padStart(2,"0")}`;
+
+    if(timeLeft<=0){
+      clearInterval(timerInterval);
+      newMail();
+    }
+  },1000);
+}
+
+// create mail
+async function createMail(){
+
+  if(domains.length===0) await loadDomains();
+
+  email=rand(8)+"@"+pickDomain();
+  password=rand(12);
+
+  document.getElementById("email").value=email;
+
+  await fetch(API+"/accounts",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({address:email,password})
+  });
+
+  const r=await fetch(API+"/token",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({address:email,password})
+  });
+
+  const d=await r.json();
+  token=d.token;
+
+  startTimer();
+  startAutoRefresh();
+
+  refreshInbox();
+}
+
+// auto refresh + notif
+function startAutoRefresh(){
+  if(interval) clearInterval(interval);
+
+  interval=setInterval(async()=>{
+    await refreshInbox(true);
+  },4000);
+}
+
+// inbox
+async function refreshInbox(silent=false){
+
+  if(!token) return;
+
+  const r=await fetch(API+"/messages",{
+    headers:{Authorization:"Bearer "+token}
+  });
+
+  const d=await r.json();
+  const msgs=d["hydra:member"];
+
+  const box=document.getElementById("inbox");
+  box.innerHTML="";
+
+  if(!msgs || msgs.length===0){
+    box.innerHTML="📭 Aucun message";
+    return;
+  }
+
+  // notif si nouveau mail
+  if(msgs.length>lastCount && !silent){
+    document.getElementById("notif").play();
+  }
+
+  lastCount=msgs.length;
+
+  msgs.forEach(m=>{
+    const div=document.createElement("div");
+    div.className="mail";
+
+    div.innerHTML=`
+      <b>De:</b> ${m.from.address}<br>
+      <b>Sujet:</b> ${m.subject || "(aucun)"}<br>
+      <span class="small">${m.intro || ""}</span>
+    `;
+
+    box.appendChild(div);
+  });
+}
+
+// reset
+function newMail(){
+  token="";
+  email="";
+  password="";
+  lastCount=0;
+
+  document.getElementById("email").value="---";
+  document.getElementById("inbox").innerHTML="Aucun message";
+
+  clearInterval(interval);
+  clearInterval(timerInterval);
+
+  createMail();
+}
+
+// init
+loadDomains();
+
+</script>
+
+</body>
+</html>
