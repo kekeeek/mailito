@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TempMail Pro</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f0f0f;
+      color: white;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 10px 14px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #4a4aff;
+      color: white;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #2f2fff;
+    }
+
+    .box {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 12px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+    }
+
+    .mail {
+      background: #222;
+      padding: 10px;
+      margin-top: 8px;
+      border-radius: 8px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: #aaa;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>📩 TempMail Pro</h1>
+
+<button onclick="createAccount()">Créer une adresse</button>
+<button onclick="loadMessages()">Refresh inbox</button>
+<button onclick="newMail()">Nouvelle adresse</button>
+
+<div class="box">
+  <p><b>Email :</b> <span id="email">---</span></p>
+  <p><b>Password :</b> <span id="pass">---</span></p>
+  <p class="small">Auto-refresh toutes les 5 secondes</p>
+</div>
+
+<div class="box">
+  <h3>📬 Inbox</h3>
+  <div id="messages">Aucun message</div>
+</div>
+
+<script>
+const API = "https://api.mail.tm";
+
+let email = "";
+let password = "";
+let token = "";
+let interval;
+
+// génère string aléatoire
+function randomString(len = 10){
+  return Math.random().toString(36).substring(2, 2 + len);
+}
+
+// créer compte mail.tm
+async function createAccount(){
+
+  email = randomString(8) + "@mail.tm";
+  password = randomString(12);
+
+  document.getElementById("email").innerText = email;
+  document.getElementById("pass").innerText = password;
+
+  // créer compte
+  await fetch(API + "/accounts", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      address: email,
+      password: password
+    })
+  });
+
+  // login token
+  const res = await fetch(API + "/token", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      address: email,
+      password: password
+    })
+  });
+
+  const data = await res.json();
+  token = data.token;
+
+  startAutoRefresh();
+  loadMessages();
+
+  alert("✅ Adresse créée !");
+}
+
+// auto refresh inbox
+function startAutoRefresh(){
+  if(interval) clearInterval(interval);
+  interval = setInterval(loadMessages, 5000);
+}
+
+// charger messages
+async function loadMessages(){
+  if(!token) return;
+
+  const res = await fetch(API + "/messages", {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  });
+
+  const data = await res.json();
+  const box = document.getElementById("messages");
+
+  box.innerHTML = "";
+
+  const msgs = data["hydra:member"];
+
+  if(!msgs || msgs.length === 0){
+    box.innerHTML = "📭 Aucun message";
+    return;
+  }
+
+  for(let msg of msgs){
+    const div = document.createElement("div");
+    div.className = "mail";
+
+    div.innerHTML = `
+      <b>De:</b> ${msg.from.address}<br>
+      <b>Sujet:</b> ${msg.subject || "(sans sujet)"}<br>
+      <span class="small">${msg.intro || ""}</span>
+    `;
+
+    box.appendChild(div);
+  }
+}
+
+// reset + nouvelle adresse
+function newMail(){
+  token = "";
+  email = "";
+  password = "";
+
+  document.getElementById("email").innerText = "---";
+  document.getElementById("pass").innerText = "---";
+  document.getElementById("messages").innerHTML = "Aucun message";
+
+  if(interval) clearInterval(interval);
+
+  createAccount();
+}
+</script>
+
+</body>
+</html>
