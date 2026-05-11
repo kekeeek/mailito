@@ -71,7 +71,7 @@ input{
 
 <body>
 
-<h1>📩 TempMail PRO MAX</h1>
+<h1>📩 TempMail</h1>
 
 <button onclick="createMail()">Créer une adresse</button>
 <button onclick="refreshInbox()">🔄 Refresh</button>
@@ -85,7 +85,7 @@ input{
     <button onclick="copyMail()">📋 Copier</button>
   </div>
 
-  <p><b>Timer :</b> <span id="timer">10:00</span></p>
+  <p><b>Timer :</b> <span id="timer">15:00</span></p>
 </div>
 
 <div class="box">
@@ -135,7 +135,7 @@ function pickDomain(){
 function startTimer(){
   clearInterval(timerInterval);
 
-  timeLeft=600;
+  timeLeft=900;
 
   timerInterval=setInterval(()=>{
     timeLeft--;
